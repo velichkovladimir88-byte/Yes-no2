@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Так / Ні</title>
+<style>
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  #circle {
+    width: 80vw;
+    height: 80vw;
+    max-width: 500px;
+    max-height: 500px;
+    border-radius: 50%;
+    background: #ffffff;
+    color: #000000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 11vw;
+    font-weight: 900;
+    cursor: pointer;
+    transition: background-color 0.4s ease, color 0.4s ease;
+    outline: none;
+  }
+  #circle:focus-visible { box-shadow: 0 0 0 4px #888; }
+  @media (min-width: 600px) { #circle { font-size: 64px; } }
+</style>
+</head>
+<body>
+<div id="circle" role="button" tabindex="0" aria-live="polite">ТРЯСІТЬ!</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var SHAKE_THRESHOLD = 15;   // чутливість: менше число = чутливіше
+  var COOLDOWN_MS = 1000;     // пауза між результатами
+
+  var circle = document.getElementById('circle');
+  var lastTrigger = 0;
+  var last = { x: null, y: null, z: null };
+  var motionStarted = false;
+
+  function decide() {
+    var now = Date.now();
+    if (now - lastTrigger < COOLDOWN_MS) return;
+    lastTrigger = now;
+
+    var yes = Math.random() < 0.5;
+    circle.textContent = yes ? 'ТАК' : 'НІ';
+    circle.style.backgroundColor = yes ? '#28a745' : '#dc3545';
+    circle.style.color = '#ffffff';
+
+    if (navigator.vibrate) navigator.vibrate(200);
+  }
+
+  function onMotion(e) {
+    var a = e.accelerationIncludingGravity;
+    if (!a || a.x === null) return;
+
+    if (last.x !== null) {
+      var delta = Math.abs(a.x - last.x) +
+                  Math.abs(a.y - last.y) +
+                  Math.abs(a.z - last.z);
+      if (delta > SHAKE_THRESHOLD) decide();
+    }
+    last.x = a.x; last.y = a.y; last.z = a.z;
+  }
+
+  function startMotion() {
+    if (motionStarted) return;
+    motionStarted = true;
+
+    // iOS 13+ вимагає дозвіл після дотику; на Android цього не потрібно
+    if (typeof DeviceMotionEvent !== 'undefined' &&
+        typeof DeviceMotionEvent.requestPermission === 'function') {
+      DeviceMotionEvent.requestPermission().then(function (state) {
+        if (state === 'granted') window.addEventListener('devicemotion', onMotion);
+      }).catch(function () {});
+    } else {
+      window.addEventListener('devicemotion', onMotion);
+    }
+  }
+
+  // Android: датчик працює одразу
+  startMotion();
+
+  circle.addEventListener('click', function () { startMotion(); decide(); });
+  circle.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); decide(); }
+  });
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
+})();
+</script>
+</body>
+</html>
